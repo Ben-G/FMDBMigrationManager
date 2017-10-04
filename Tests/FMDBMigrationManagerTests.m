@@ -467,4 +467,15 @@ static FMDatabase *FMDatabaseWithSchemaMigrationsTable()
     }).to.raiseWithReason(NSInvalidArgumentException, @"Failed to add migrations because an object in `migrations` array doesn't conform to the `FMDBMigrating` protocol.");
 }
 
+- (void)testPicksUpDevelopmentOnlyMigrationsWhenFlagEnabled
+{
+    FMDBMigrationManager *manager = [FMDBMigrationManager managerWithDatabaseAtPath:FMDBRandomDatabasePath() migrationsBundle:FMDBMigrationsTestBundle()];
+    manager.dynamicMigrationsEnabled = NO;
+    manager.developmentOnlyMigrationsEnabled = YES;
+    NSArray *migrations = manager.migrations;
+    expect(migrations).to.haveCountOf(3);
+    expect([migrations valueForKey:@"name"]).to.equal(@[@"create_mb-demo-schema", @"create_add_second_table", @"add_dev_table"]);
+    expect([migrations valueForKey:@"version"]).to.equal(@[@201406063106474, @201406063548463, @201710041310359 ]);
+}
+
 @end

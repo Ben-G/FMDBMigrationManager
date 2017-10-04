@@ -55,6 +55,12 @@
  */
 @property (nonatomic, assign) BOOL dynamicMigrationsEnabled;
 
+/**
+ @abstract Determines whether the receiver will consider file-based migrations that are development only. Default: `NO`.
+ @discussion When `YES` file based migrations with a filename that begins with `DEV_` will be included in the migration.
+ */
+@property (nonatomic, assign) BOOL developmentOnlyMigrationsEnabled;
+
 ///--------------------------------------------------
 /// @name Accessing Database Path & Migrations Bundle
 ///--------------------------------------------------
