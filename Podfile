@@ -1,4 +1,4 @@
-xcodeproj 'Tests/FMDBMigrationManagerTests'
+project 'Tests/FMDBMigrationManagerTests'
 workspace 'FMDBMigrationManager'
 
 def import_pods
@@ -7,14 +7,14 @@ def import_pods
   pod 'FMDBMigrationManager', :path => '.'
 end
 
-target :ios do
+target 'iOS Tests' do
+  project 'Tests/FMDBMigrationManagerTests.xcodeproj'
   platform :ios, '7.0'
-  link_with 'iOS Tests'
   import_pods
 end
 
-target :osx do
+target 'OS X Tests' do
+  project 'Tests/FMDBMigrationManagerTests.xcodeproj'
   platform :osx, '10.9'
-  link_with 'OS X Tests'
   import_pods
 end

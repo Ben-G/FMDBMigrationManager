@@ -26,8 +26,17 @@ NSString *const FMDBMigrationManagerErrorDomain = @"com.layer.FMDBMigrationManag
 NSString *const FMDBMigrationManagerProgressVersionUserInfoKey = @"version";
 NSString *const FMDBMigrationManagerProgressMigrationUserInfoKey = @"migration";
 
+#define MIGRATION_FILENAME_REGEX @"(\\d+)_?((?<=_)[\\w\\s-]+)?(?<!_)\\.sql$"
+
 // Private Constants
-static NSString *const FMDBMigrationFilenameRegexString = @"^(\\d+)_?((?<=_)[\\w\\s-]+)?(?<!_)\\.sql$";
+static NSString *const FMDBMigrationFilenameRegexString = @"^" MIGRATION_FILENAME_REGEX;
+static NSString *const FMDBDevelopmentMigrationFilenameRegexString = @"^(?:DEV_)?" MIGRATION_FILENAME_REGEX;
+
+@interface FMDBFileMigration ()
+
++ (instancetype)migrationWithPath:(NSString *)path filenameRegex:(NSString *)filenameRegex;
+
+@end
 
 BOOL FMDBIsMigrationAtPath(NSString *path)
 {
@@ -89,6 +98,7 @@ static NSArray *FMDBClassesConformingToProtocol(Protocol *protocol)
         _database = database;
         _migrationsBundle = migrationsBundle;
         _dynamicMigrationsEnabled = YES;
+        _developmentOnlyMigrationsEnabled = NO;
         _externalMigrations = [NSMutableArray new];
         if (![database goodConnection]) {
             self.shouldCloseOnDealloc = YES;
@@ -205,12 +215,13 @@ static NSArray *FMDBClassesConformingToProtocol(Protocol *protocol)
     if (_migrations) return _migrations;
     
     NSArray *migrationPaths = [self.migrationsBundle pathsForResourcesOfType:@"sql" inDirectory:nil];
-    NSRegularExpression *migrationRegex = [NSRegularExpression regularExpressionWithPattern:FMDBMigrationFilenameRegexString options:0 error:nil];
+    NSString *migrationFileNameRegex = self.developmentOnlyMigrationsEnabled ? FMDBDevelopmentMigrationFilenameRegexString : FMDBMigrationFilenameRegexString;
+    NSRegularExpression *migrationRegex = [NSRegularExpression regularExpressionWithPattern:migrationFileNameRegex options:0 error:nil];
     NSMutableArray *migrations = [NSMutableArray new];
     for (NSString *path in migrationPaths) {
         NSString *filename = [path lastPathComponent];
         if ([migrationRegex rangeOfFirstMatchInString:filename options:0 range:NSMakeRange(0, [filename length])].location != NSNotFound) {
-            FMDBFileMigration *migration = [FMDBFileMigration migrationWithPath:path];
+            FMDBFileMigration *migration = [FMDBFileMigration migrationWithPath:path filenameRegex: migrationFileNameRegex];
             [migrations addObject:migration];
         }
     }
@@ -309,10 +320,10 @@ static NSArray *FMDBClassesConformingToProtocol(Protocol *protocol)
 
 @end
 
-static BOOL FMDBMigrationScanMetadataFromPath(NSString *path, uint64_t *version, NSString **name)
+static BOOL FMDBMigrationScanMetadataFromPath(NSString *path, NSString *filenameRegex, uint64_t *version, NSString **name)
 {
     NSError *error = nil;
-    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:FMDBMigrationFilenameRegexString options:0 error:&error];
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:filenameRegex options:0 error:&error];
     if (!regex) {
         NSLog(@"[FMDBMigration] Failed constructing regex: %@", error);
         return NO;
@@ -339,16 +350,20 @@ static BOOL FMDBMigrationScanMetadataFromPath(NSString *path, uint64_t *version,
 
 @implementation FMDBFileMigration
 
-+ (instancetype)migrationWithPath:(NSString *)path
-{
-    return [[self alloc] initWithPath:path];
++ (instancetype)migrationWithPath:(NSString *)path {
+    return [[self alloc] initWithPath:path filenameRegex:FMDBMigrationFilenameRegexString];
 }
 
-- (id)initWithPath:(NSString *)path
++ (instancetype)migrationWithPath:(NSString *)path filenameRegex:(NSString *)filenameRegex
+{
+    return [[self alloc] initWithPath:path filenameRegex:filenameRegex];
+}
+
+- (id)initWithPath:(NSString *)path filenameRegex:(NSString *)filenameRegex
 {
     NSString *name;
     uint64_t version;
-    if (!FMDBMigrationScanMetadataFromPath(path, &version, &name)) return nil;
+    if (!FMDBMigrationScanMetadataFromPath(path, filenameRegex, &version, &name)) return nil;
     
     self = [super init];
     if (self) {
